@@ -6,7 +6,6 @@
   - [Features](#Features)
   - [Connections](#Connections)
   - [Use](#Use)
-  - 
 
 ## Features
  - Write voltage to specified output pins (specify max voltage)
