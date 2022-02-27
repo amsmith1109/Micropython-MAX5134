@@ -10,7 +10,7 @@ _WRITE_THROUGH  =   0x30
 
 # Datasheet available at https://datasheets.maximintegrated.com/en/ds/MAX5134-MAX5137.pdf
 class MAX5134:
-    def __init__(self, CS, SPI, max=None, mz = 0):
+    def __init__(self, CS, SPI, max=None, mz = False):
         if max is None:
             max = 5 #Assumes a default of 5 V max
         self.cs = CS
@@ -21,9 +21,9 @@ class MAX5134:
         # The startup behavior of the MAX5134 depends on how the M/Z
         # pin has been wired. 0 = ground, 1 = 5 V.
         # Setting a logic high defaults the output to the halfway point.
-        if mz == 0:
+        if mz == False:
             self.setpoint = [0, 0, 0, 0]
-        elif mz ==1:
+        elif mz == True:
             self.setpoint = [1, 1, 1, 1] * self.max * 0.5
         self.register = [0, 0, 0, 0]
 
@@ -32,7 +32,7 @@ class MAX5134:
     def write(self, channel, voltage):
         channel_word = self.channel_word(channel)
         select = _WRITE_THROUGH + channel_word
-        val = self.v2b(voltage)
+        val, voltage = self.v2b(voltage)
         stream = ustruct.pack('>BH', select, val)
         self.push(stream)
         self.update_setpoint(channel, voltage)
@@ -40,7 +40,7 @@ class MAX5134:
     def load(self, channel, voltage):
         channel_word = self.channel_word(channel)
         select = _WRITE + channel_word
-        val = self.v2b(voltage)
+        val, voltage = self.v2b(voltage)
         stream = ustruct.pack('>BH', select, val)
         self.push(stream)
         if isinstance(channel, list):
@@ -64,8 +64,8 @@ class MAX5134:
     # of the MAX5134. Inputs must be loaded using the load function
     # prior to using load.
     #
-    # This feature is commonly used when there are multiple DACs that
-    # need to have their outputs change at the same time. 
+    # This feature is commonly used when multiple channels or multiple
+    # MAX5134 need to have their output changed simultaneously
     def ldac(self, channel):
         channel_word = self.channel_word(channel)
         stream = ustruct.pack('>BBB', _LDAC, channel_word, 0xff)
@@ -111,15 +111,17 @@ class MAX5134:
     def v2b(self, voltage):
         if voltage >= self.max: #Handles rollover
             val = 2**16-1
+            voltage = self.max
             print('Input set to max.')
         elif voltage < 0: #Handles rollover (again)
             val = 0
+            voltage = 0
             print('Input is negative. Setting to zero.')
         else:
             val = int(round(voltage * 2 ** 16 / self.max))
-        return val
+        return val, voltage
     
-    def update_setpoint(channel, voltage):
+    def update_setpoint(self, channel, voltage):
         if isinstance(channel, list):
             for i in channel:
                 if isinstance(voltage, list):
